@@ -4,6 +4,12 @@
 
 AeroSpace is an i3-like tiling window manager for macOS
 
+> **Fork note.** This fork adds side-aware modifiers, so a binding can tell the left Option key
+> from the right one. Upstream cannot: Carbon global hot keys only know a single `.option` flag.
+> On layouts where right Option types characters this made them unreachable -- a plain `alt-2`
+> binding swallows right-alt-2, so `@` could not be typed on the Spanish layout while AeroSpace
+> was running. See [Fork changes](#fork-changes) below.
+
 Videos:
 - [YouTube 91 sec Demo](https://www.youtube.com/watch?v=UOl7ErqWbrk)
 - [YouTube Guide by Josean Martinez](https://www.youtube.com/watch?v=-FoWClVHG5g)
@@ -178,3 +184,40 @@ In alphabetical order:
 - [yabai](https://github.com/koekeishiya/yabai) -
   A window manager that provides tight integration with native macOS Spaces and goes all the way to private APIs and code injection.
   yabai is a source of inspiration for a lot of other OSS projects.
+
+## Fork changes
+
+### Side-aware modifiers
+
+Bindings may name a physical side of the keyboard:
+
+```toml
+[mode.main.binding]
+left-alt-h = 'focus left'
+left-alt-2 = 'workspace 2'   # right-alt-2 still types @
+```
+
+All eight variants are accepted: `left-alt`, `right-alt`, `left-cmd`, `right-cmd`, `left-ctrl`,
+`right-ctrl`, `left-shift`, `right-shift`. Bindings without a side (`alt-h`) behave exactly as
+before and still match either side.
+
+Sided bindings bypass HotKey and are matched in a `CGEventTap` installed ahead of Carbon, reading
+the device dependent bits of `CGEvent.flags` that `NSEvent.ModifierFlags` discards. Events the tap
+does not claim are passed through untouched, which is what lets right Option reach the focused app.
+The tap is only created when at least one sided binding is configured.
+
+Note that macOS blocks keyboard event taps while *secure input* is active (password fields, `sudo`
+in a terminal, some password managers), so sided bindings do not fire during those moments.
+Bindings without a side are unaffected.
+
+### Building without Xcode
+
+`build-release.sh` drives `xcodebuild` and therefore needs a full Xcode install. `build-local.sh`
+produces an equivalent optimized App Bundle using only the Command Line Tools:
+
+```bash
+./build-local.sh --install
+```
+
+It applies its workarounds to a throwaway copy of the tree rather than to the sources, so this
+fork stays rebasable onto upstream.
